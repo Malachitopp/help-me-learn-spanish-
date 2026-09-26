@@ -1,0 +1,32 @@
+# XcodeGen spec: `xcodegen generate` turns this into SpanishLens.xcodeproj.
+# The .xcodeproj is not committed; the GitHub Actions build generates it.
+name: SpanishLens
+options:
+  bundleIdPrefix: com.malachitopp
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  SpanishLens:
+    type: application
+    platform: iOS
+    sources:
+      - SpanishLens
+    info:
+      path: SpanishLens/Info.plist
+      properties:
+        CFBundleDisplayName: Spanish Lens
+        UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.malachitopp.spanishlens
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+    scheme: {}
