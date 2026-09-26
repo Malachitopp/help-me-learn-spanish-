@@ -10,7 +10,8 @@ enum Renderer {
 
         let pixels = PixelSampler(image)
 
-        return UIGraphicsImageRenderer(size: size, format: format).pngData { context in
+        // JPEG rather than PNG: much faster to encode at full resolution, and a smaller file to hand back.
+        return UIGraphicsImageRenderer(size: size, format: format).jpegData(withCompressionQuality: 0.9) { context in
             UIImage(cgImage: image).draw(in: CGRect(origin: .zero, size: size))
 
             for (line, text) in zip(lines, translations) {
@@ -28,36 +29,43 @@ enum Renderer {
         }
     }
 
-    /// Shrinks the font until the text (wrapping if needed) fits the box, then centres it vertically.
+    /// Picks the largest font where the text (wrapping if needed) fits the box, then centres it vertically.
     private static func drawFitted(_ text: String, in rect: CGRect, color: UIColor) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byWordWrapping
 
-        var fontSize = rect.height * 0.85
-        var attributes: [NSAttributedString.Key: Any] = [:]
-        var needed = CGRect.zero
-
-        while true {
-            attributes = [
-                .font: UIFont.systemFont(ofSize: fontSize),
-                .foregroundColor: color,
-                .paragraphStyle: paragraph,
-            ]
-            needed = (text as NSString).boundingRect(
+        func attributes(_ fontSize: CGFloat) -> [NSAttributedString.Key: Any] {
+            [.font: UIFont.systemFont(ofSize: fontSize), .foregroundColor: color, .paragraphStyle: paragraph]
+        }
+        func textSize(_ fontSize: CGFloat) -> CGRect {
+            (text as NSString).boundingRect(
                 with: CGSize(width: rect.width, height: .greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin],
-                attributes: attributes,
+                attributes: attributes(fontSize),
                 context: nil
             )
-            if needed.height <= rect.height * 1.05 || fontSize <= 8 { break }
-            fontSize -= 1
+        }
+        func fits(_ fontSize: CGFloat) -> Bool { textSize(fontSize).height <= rect.height * 1.05 }
+
+        // Binary search between 8pt and 85% of the box height: ~7 measurements instead of dozens.
+        var low: CGFloat = 8
+        var high = max(low, rect.height * 0.85)
+        if fits(high) {
+            low = high
+        } else {
+            for _ in 0..<7 {
+                let mid = (low + high) / 2
+                if fits(mid) { low = mid } else { high = mid }
+            }
         }
 
+        let finalAttributes = attributes(low)
+        let needed = textSize(low)
         let origin = CGPoint(x: rect.minX, y: rect.midY - needed.height / 2)
         (text as NSString).draw(
             with: CGRect(origin: origin, size: CGSize(width: rect.width, height: needed.height)),
             options: [.usesLineFragmentOrigin],
-            attributes: attributes,
+            attributes: finalAttributes,
             context: nil
         )
     }

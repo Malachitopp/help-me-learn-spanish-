@@ -18,7 +18,9 @@ struct TranslateScreenshotIntent: AppIntent {
     var screenshot: IntentFile
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
-        let png = try await ScreenshotTranslator.translate(imageData: screenshot.data)
-        return .result(value: IntentFile(data: png, filename: "translated.png", type: .png))
+        let output = try await ScreenshotTranslator.translate(imageData: screenshot.data)
+        // No text found: hand the screenshot back unchanged.
+        guard let jpeg = output.translatedJPEG else { return .result(value: screenshot) }
+        return .result(value: IntentFile(data: jpeg, filename: "translated.jpg", type: .jpeg))
     }
 }

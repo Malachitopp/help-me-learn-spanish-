@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var result: UIImage?
     @State private var errorMessage: String?
     @State private var working = false
+    @State private var stages: [(name: String, duration: Duration)] = []
 
     var body: some View {
         NavigationStack {
@@ -47,6 +48,16 @@ struct ContentView: View {
                             if let errorMessage {
                                 Text(errorMessage).foregroundStyle(.red)
                             }
+                            if !stages.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    ForEach(Array(stages.enumerated()), id: \.offset) { _, stage in
+                                        timingRow(stage.name, stage.duration)
+                                    }
+                                    timingRow("Total", stages.reduce(Duration.zero) { $0 + $1.duration })
+                                        .bold()
+                                }
+                                .font(.footnote.monospacedDigit())
+                            }
                             if let result {
                                 Image(uiImage: result)
                                     .resizable()
@@ -81,13 +92,25 @@ struct ContentView: View {
     private func translate(_ item: PhotosPickerItem) async {
         working = true
         errorMessage = nil
+        stages = []
         defer { working = false }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else { return }
-            let png = try await ScreenshotTranslator.translate(imageData: data)
-            result = UIImage(data: png)
+            let output = try await ScreenshotTranslator.translate(imageData: data)
+            stages = output.stages
+            result = UIImage(data: output.translatedJPEG ?? data)
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func timingRow(_ name: String, _ duration: Duration) -> some View {
+        let (seconds, attoseconds) = duration.components
+        let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
+        return HStack {
+            Text(name)
+            Spacer()
+            Text("\(milliseconds) ms")
         }
     }
 }
