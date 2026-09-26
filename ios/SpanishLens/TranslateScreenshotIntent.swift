@@ -9,7 +9,12 @@ struct TranslateScreenshotIntent: AppIntent {
         "Translates the Spanish text in an image into English and paints it over the original."
     )
 
-    @Parameter(title: "Screenshot", supportedContentTypes: [.image])
+    // Auto-connects to the previous action's output (e.g. Take Screenshot) instead of asking for a file.
+    @Parameter(
+        title: "Screenshot",
+        supportedContentTypes: [.image],
+        inputConnectionBehavior: .connectToPreviousIntentResult
+    )
     var screenshot: IntentFile
 
     func perform() async throws -> some IntentResult & ReturnsValue<IntentFile> {
