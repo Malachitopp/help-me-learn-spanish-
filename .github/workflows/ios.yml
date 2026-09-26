@@ -27,8 +27,6 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ARCHIVE_PATH: ${{ runner.temp }}/SpanishLens.xcarchive
-      KEY_PATH: ${{ runner.temp }}/AuthKey.p8
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +43,7 @@ jobs:
       - name: Write App Store Connect API key
         env:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-        run: printf '%s\n' "$ASC_KEY_P8" > "$KEY_PATH"
+        run: printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
 
       # Signing is automatic: the API key lets Xcode create the certificate and
       # provisioning profile in the cloud, so no Mac or keychain setup is needed.
@@ -55,9 +53,9 @@ jobs:
             -project SpanishLens.xcodeproj \
             -scheme SpanishLens \
             -destination "generic/platform=iOS" \
-            -archivePath "$ARCHIVE_PATH" \
+            -archivePath "$RUNNER_TEMP/SpanishLens.xcarchive" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
@@ -67,14 +65,14 @@ jobs:
         run: |
           plutil -insert teamID -string "$APPLE_TEAM_ID" ExportOptions.plist
           xcodebuild -exportArchive \
-            -archivePath "$ARCHIVE_PATH" \
+            -archivePath "$RUNNER_TEMP/SpanishLens.xcarchive" \
             -exportOptionsPlist ExportOptions.plist \
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Remove API key
         if: always()
-        run: rm -f "$KEY_PATH"
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
