@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import vision from '@google-cloud/vision';
 import {v2} from '@google-cloud/translate'
 
+import {createCanvas, loadImage} from '@napi-rs/canvas'
+
+
 export interface Box {
   x: number;
   y: number;
@@ -75,4 +78,28 @@ export class TranslateService{
     translations = Array.isArray(translations) ? translations : [translations];
     return translations
   }
+}
+
+
+@Injectable()
+export class canvas{
+  async drawImage(image:Buffer, blocks:TextBlock[], translations:string[]): Promise<Buffer>{
+    const img = await loadImage(image);
+    const canvas = createCanvas(img.width, img.height);
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0 )
+
+
+
+    for (let i=0; i < blocks.length; i ++) {
+      const box = blocks[i].box;
+      const message = translations[i];
+      ctx.fillRect(box.x,box.y,box.width,box.height)
+      ctx.font = "20px Arial";
+      ctx.fillStyle = "white";
+      ctx.fillText(message,box.x, box.y)
+    }
+    return canvas.encode('png')
+  }
+
 }

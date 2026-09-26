@@ -1,15 +1,19 @@
-import { Controller,Query, Post, UseInterceptors, UploadedFile, ParseFilePipe, FileTypeValidator} from '@nestjs/common';
+import { StreamableFile, Header, Controller,Query, Post, UseInterceptors, UploadedFile, ParseFilePipe, FileTypeValidator} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express'
 import { MaxFileSizeValidator } from '@nestjs/common';
-import { OcrService, TranslateService } from './app.service.js';
+import { OcrService, TranslateService, canvas } from './app.service.js';
+
 
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 
 @Controller()
 export class translation {
-  constructor(private readonly ocr:OcrService, private readonly translator: TranslateService) {} 
+  constructor(private readonly ocr:OcrService, 
+    private readonly translator: TranslateService,
+    private readonly draw:canvas) {} 
   @Post('translate')
+  @Header('Content-type', 'image/png')
   @UseInterceptors(FileInterceptor('file', {
     limits: {
       fileSize: MAX_UPLOAD_BYTES,
@@ -28,8 +32,14 @@ export class translation {
   ) {
     const blocks = await this.ocr.detect(file.buffer);
     const text = blocks.map((b) => b.text);
-    const coordinates = blocks.map((b)=> b.box)
+    
     const translations = await this.translator.translate(text, to)
+
+    const png = await this.draw.drawImage(file.buffer, blocks, translations);
+
+    return new StreamableFile(png)
   }
 
 }
+
+
