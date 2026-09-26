@@ -40,6 +40,13 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      # Strip stray spaces/newlines from pasted secrets, then pass them on to later steps.
+      - name: Clean up secrets
+        run: |
+          for name in APPLE_TEAM_ID ASC_KEY_ID ASC_ISSUER_ID; do
+            echo "$name=$(printf '%s' "${!name}" | tr -d '[:space:]')" >> "$GITHUB_ENV"
+          done
+
       - name: Write App Store Connect API key
         env:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
