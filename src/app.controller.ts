@@ -1,4 +1,4 @@
-import { StreamableFile, Header, Controller,Query, Post, UseInterceptors, UploadedFile, ParseFilePipe, FileTypeValidator} from '@nestjs/common';
+import { StreamableFile, Header, Controller, Post, UseInterceptors, UploadedFile, ParseFilePipe, FileTypeValidator} from '@nestjs/common';
 import {FileInterceptor} from '@nestjs/platform-express'
 import { MaxFileSizeValidator } from '@nestjs/common';
 import { OcrService, TranslateService, canvas } from './app.service.js';
@@ -28,13 +28,16 @@ export class translation {
       ],
   }),
   )
-  file: Express.Multer.File,@Query('to') to:string 
+  file: Express.Multer.File
   ) {
     const blocks = await this.ocr.detect(file.buffer);
+    // no text found: send the original screenshot back unchanged
+    if (blocks.length === 0) {
+      return new StreamableFile(file.buffer);
+    }
     const text = blocks.map((b) => b.text);
-    
-    const translations = await this.translator.translate(text, to)
 
+    const translations = await this.translator.translate(text);
     const png = await this.draw.drawImage(file.buffer, blocks, translations);
 
     return new StreamableFile(png)

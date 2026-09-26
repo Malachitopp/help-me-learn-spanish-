@@ -73,8 +73,8 @@ function toBox(vertices: { x?: number | null; y?: number | null }[]): Box {
 export class TranslateService{
   private readonly trans = new v2.Translate()
 
-  async translate(texts: string[], to: string): Promise<string[]>{
-    let [translations] = await this.trans.translate(texts, to);
+  async translate(texts: string[]): Promise<string[]>{
+    let [translations] = await this.trans.translate(texts, { from: 'es', to: 'en' });
     translations = Array.isArray(translations) ? translations : [translations];
     return translations
   }
@@ -88,15 +88,20 @@ export class canvas{
     const canvas = createCanvas(img.width, img.height);
     const ctx = canvas.getContext('2d')
     ctx.drawImage(img, 0, 0 )
-
-
+    // make y the top of the text, so it lines up with box.y
+    ctx.textBaseline = 'top';
 
     for (let i=0; i < blocks.length; i ++) {
       const box = blocks[i].box;
       const message = translations[i];
-      ctx.fillRect(box.x,box.y,box.width,box.height)
-      ctx.font = "20px Arial";
+      // fillStyle is shared: white for the cover box, then black for the text
       ctx.fillStyle = "white";
+      // grow the cover a few pixels so accents and ¿ ¡ that stick out of the box are hidden too
+      const pad = 4;
+      ctx.fillRect(box.x - pad, box.y - pad, box.width + pad * 2, box.height + pad * 2)
+      // scale the font to the box instead of a fixed size (screenshots are high resolution)
+      ctx.font = `${Math.round(box.height * 0.8)}px Arial`;
+      ctx.fillStyle = "black";
       ctx.fillText(message,box.x, box.y)
     }
     return canvas.encode('png')
