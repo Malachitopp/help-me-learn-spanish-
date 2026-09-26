@@ -39,20 +39,26 @@ enum ScreenshotTranslator {
         guard let image = UIImage(data: imageData)?.cgImage else { throw Failure.unreadableImage }
         finishStage("Decode image")
 
-        let lines = try TextRecognizer.recognize(in: image)
+        let allLines = try TextRecognizer.recognize(in: image)
         finishStage("Read text (OCR)")
+
+        // Only translate lines that look Spanish; times, numbers and English UI text are left as they are.
+        let lines = LineFilter.linesToTranslate(allLines)
+        finishStage("Pick Spanish lines (\(lines.count) of \(allLines.count))")
         if lines.isEmpty { return TranslationOutput(translatedJPEG: nil, stages: stages) }
 
         let translations: [String]
         do {
-            translations = try await Translator.translate(lines.map(\.text))
+            translations = try await Translator.translate(lines.map(\.text)) {
+                finishStage("Translate first line (loads model)")
+            }
         } catch {
             // Only check the language packs when translating fails, rather than on every run.
             let ready = await Translator.isReady()
             if !ready { throw Failure.languagesNotDownloaded }
             throw error
         }
-        finishStage("Translate")
+        finishStage("Translate remaining lines")
 
         guard let jpeg = Renderer.draw(on: image, lines: lines, translations: translations) else {
             throw Failure.renderFailed
