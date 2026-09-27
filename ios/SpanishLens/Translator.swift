@@ -3,8 +3,10 @@ import Translation
 
 /// On-device Spanish → English with Apple's Translation framework (the Swift version of TranslateService).
 enum Translator {
-    static let source = Locale.Language(identifier: "es")
-    static let target = Locale.Language(identifier: "en")
+    // Regions are spelled out (matching LanguageAvailability's supportedLanguages) so the system doesn't
+    // pick them from the phone's language settings. Bare "es"/"en" broke after switching the phone to Spanish.
+    static let source = Locale.Language(identifier: "es-ES")
+    static let target = Locale.Language(identifier: "en-US")
 
     /// Reused between runs, so the language model stays loaded while the app is alive.
     private static var cachedSession: TranslationSession?
@@ -12,6 +14,22 @@ enum Translator {
     /// True once the Spanish and English language packs are downloaded, so translation works offline.
     static func isReady() async -> Bool {
         await LanguageAvailability().status(from: source, to: target) == .installed
+    }
+
+    /// Apple's download prompt closes as soon as the person agrees, and the download carries on in the
+    /// background, so check every couple of seconds until the packs are installed.
+    static func waitUntilReady(timeout: Duration = .seconds(300)) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        while clock.now < deadline {
+            if await isReady() { return true }
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return false  // The screen went away.
+            }
+        }
+        return await isReady()
     }
 
     /// Returns one translation per input, in the same order.

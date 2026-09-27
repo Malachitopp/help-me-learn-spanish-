@@ -3,7 +3,10 @@ import SwiftUI
 import Translation
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var languagesReady = false
+    @State private var downloading = false
+    @State private var downloadError: String?
     @State private var downloadConfig: TranslationSession.Configuration?
     @State private var pickedItem: PhotosPickerItem?
     @State private var result: UIImage?
@@ -16,20 +19,35 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     GroupBox("1. Download Spanish → English") {
-                        if languagesReady {
-                            Label("Ready. Works offline.", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            Button("Download languages") {
-                                downloadConfig = TranslationSession.Configuration(
-                                    source: Translator.source,
-                                    target: Translator.target
-                                )
+                        VStack(alignment: .leading, spacing: 8) {
+                            if languagesReady {
+                                Label("Ready. Works offline.", systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            } else if downloading {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                    Text("Downloading…")
+                                }
+                            } else {
+                                Button("Download languages") {
+                                    // Setting an identical configuration again doesn't re-run .translationTask,
+                                    // so later taps have to invalidate the existing one instead.
+                                    if downloadConfig == nil {
+                                        downloadConfig = TranslationSession.Configuration(
+                                            source: Translator.source,
+                                            target: Translator.target
+                                        )
+                                    } else {
+                                        downloadConfig?.invalidate()
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            if let downloadError {
+                                Text(downloadError).foregroundStyle(.red)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     GroupBox("2. Set up the Action Button") {
@@ -74,14 +92,26 @@ struct ContentView: View {
         .task {
             languagesReady = await Translator.isReady()
         }
+        // Check again when coming back to the app, e.g. after changing the phone's language
+        // or downloading languages in Apple's Translate app.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { languagesReady = await Translator.isReady() }
+        }
         // Asks the system to download the language packs (shows Apple's download prompt).
         .translationTask(downloadConfig) { session in
+            downloading = true
+            downloadError = nil
+            defer { downloading = false }
             do {
                 try await session.prepareTranslation()
+                languagesReady = await Translator.waitUntilReady()
+                if !languagesReady {
+                    downloadError = "Still not downloaded. Tap Download languages to try again, or download Spanish and English (US) in Apple's Translate app."
+                }
             } catch {
-                errorMessage = error.localizedDescription
+                downloadError = error.localizedDescription
             }
-            languagesReady = await Translator.isReady()
         }
         .onChange(of: pickedItem) { _, item in
             guard let item else { return }
